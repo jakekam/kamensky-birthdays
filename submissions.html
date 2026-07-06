@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kamensky Birthday Submissions</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#FBF4E9; color:#33281F; margin:0; padding:32px 16px; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color:#8A7A68; margin: 0 0 24px; font-size: 14px; }
+  .card { background:#FFFDF9; border:1.5px solid #EADFCF; border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+  .cardhead { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .cardhead strong { font-size:17px; }
+  .cardhead span { color:#A79683; font-size:13px; }
+  table { width:100%; border-collapse: collapse; font-size:14px; }
+  th { text-align:left; color:#8A7A68; font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:4px 8px 4px 0; border-bottom:1px solid #EADFCF; }
+  td { padding:6px 8px 6px 0; border-bottom:1px solid #F3EADA; }
+  tr:last-child td { border-bottom:none; }
+  .missing { background:#F6EEDF; border-radius:12px; padding:12px 16px; font-size:14px; color:#7A5C36; margin-bottom:24px; }
+  .err { background:#FBE4DC; border-radius:12px; padding:12px 16px; font-size:14px; color:#C0472A; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎂 Birthday submissions</h1>
+  <p class="sub" id="sub">Loading…</p>
+  <div id="out"></div>
+</div>
+<script>
+(function () {
+  var ENDPOINT = "https://jdgvyngjhbxhrtffquba.supabase.co/functions/v1/bday-capture";
+  var FAMILY = {
+    ta: { name: "Ta Kamensky" },
+    mom: { name: "Mom Kamensky" },
+    chana: { name: "Chana", spouse: "Shmaya", kids: ["Mushka","Mendel","Yossi","Sholom","Menucha","Shaina","Sarale","Zalman","Rivkah","Shmuli"] },
+    chaya: { name: "Chaya", kids: ["Moussia","Menachem","Sholom"] },
+    rivkah: { name: "Rivkah", spouse: "Simon", kids: ["Elijah","Ahava","Rafa"] },
+    schneur: { name: "Schneur", spouse: "Sonya", kids: ["Tehila","Menucha","Benny","Ari","Yehuda","Sholom"] },
+    moussia: { name: "Moussia", spouse: "Gavi", kids: ["Aria","Bella","Zane","Luna"] },
+    charna: { name: "Charna" },
+    shmuel: { name: "Shmuel", spouse: "Roni", kids: ["Ofer"] },
+    yaakov: { name: "Yaakov" },
+    chezky: { name: "Chezky" },
+    shaina: { name: "Shaina", spouse: "Moshe" }
+  };
+  var HEB = { tishrei:"Tishrei", cheshvan:"Cheshvan", kislev:"Kislev", tevet:"Tevet", shevat:"Shevat",
+    adar:"Adar", adar1:"Adar I", adar2:"Adar II", nisan:"Nisan", iyar:"Iyar", sivan:"Sivan",
+    tammuz:"Tammuz", av:"Av", elul:"Elul" };
+  var ENG = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  function esc(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  function subjectLabel(pid, subject) {
+    var fam = FAMILY[pid];
+    if (subject === "self") return fam ? fam.name : pid;
+    if (subject === "spouse") return fam && fam.spouse ? fam.spouse + " (spouse)" : "Spouse";
+    var m = subject.match(/^kid(\d+)$/);
+    if (m && fam && fam.kids && fam.kids[+m[1]]) return fam.kids[+m[1]] + " (kid)";
+    return subject;
+  }
+  function render(rows) {
+    var out = "";
+    var submitted = {};
+    rows.forEach(function (row) {
+      submitted[row.selected_id] = true;
+      var p = row.payload || {};
+      var subjects = {};
+      Object.keys(p).forEach(function (k) {
+        var rest = k.indexOf(row.selected_id + "_") === 0 ? k.slice(row.selected_id.length + 1) : k;
+        var us = rest.indexOf("_");
+        if (us < 0) return;
+        var subject = rest.slice(0, us), group = rest.slice(us + 1);
+        (subjects[subject] = subjects[subject] || {})[group] = p[k];
+      });
+      var order = Object.keys(subjects).sort(function (a, b) {
+        function rank(s) { return s === "self" ? 0 : s === "spouse" ? 1 : 2 + (parseInt(s.replace("kid",""), 10) || 0); }
+        return rank(a) - rank(b);
+      });
+      var when = new Date(row.created_at).toLocaleString("en-US", {
+        timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit"
+      }) + " ET";
+      var trs = order.map(function (s) {
+        var g = subjects[s];
+        var eng = g.eng_month && g.eng_day ? ENG[+g.eng_month] + " " + g.eng_day : "—";
+        var heb = g.heb_notsure === "true" ? "not sure" : (g.heb_month && g.heb_day ? (HEB[g.heb_month] || g.heb_month) + " " + g.heb_day : "—");
+        return "<tr><td>" + esc(subjectLabel(row.selected_id, s)) + "</td><td>" + esc(g.year || "—") + "</td><td>" + esc(eng) + "</td><td>" + esc(heb) + "</td></tr>";
+      }).join("");
+      out += '<div class="card"><div class="cardhead"><strong>' + esc(row.submitter_name || row.selected_id) +
+        "</strong><span>" + esc(when) + "</span></div>" +
+        "<table><thead><tr><th>Person</th><th>Year</th><th>English</th><th>Hebrew</th></tr></thead><tbody>" + trs + "</tbody></table></div>";
+    });
+    var missing = Object.keys(FAMILY).filter(function (id) { return !submitted[id]; }).map(function (id) { return FAMILY[id].name; });
+    var banner = missing.length
+      ? '<div class="missing"><strong>Still waiting on:</strong> ' + esc(missing.join(", ")) + "</div>"
+      : '<div class="missing">✅ Everyone has submitted!</div>';
+    document.getElementById("sub").textContent = rows.length + " submission" + (rows.length === 1 ? "" : "s") + " · newest first · times in ET. Refresh for the latest.";
+    document.getElementById("out").innerHTML = banner + (out || "<p>No submissions yet.</p>");
+  }
+
+  var viewKey = new URLSearchParams(location.search).get("view");
+  if (!viewKey) {
+    document.getElementById("sub").textContent = "";
+    document.getElementById("out").innerHTML = '<div class="err">Missing view key — use the full link Jake shared.</div>';
+    return;
+  }
+  fetch(ENDPOINT + "?view=" + encodeURIComponent(viewKey))
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j.ok) throw new Error(j.error || "request failed");
+      render(j.submissions);
+    })
+    .catch(function (e) {
+      document.getElementById("sub").textContent = "";
+      document.getElementById("out").innerHTML = '<div class="err">Could not load submissions: ' + esc(e.message) + "</div>";
+    });
+})();
+</script>
+</body>
+</html>
