@@ -253,9 +253,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   setInterval(function () {
     deepAll("[name]").forEach(grab);
-    var t = deepText();
-    if (t.indexOf("Your reward") > -1) submitToGHL();
-    else if (t.indexOf("Hi, Kamensky crew") > -1) { posted = false; CAPTURED = {}; }
+    /* innerText reflects CSS text-transform (the reward label renders uppercase), so compare lowercase */
+    var t = deepText().toLowerCase();
+    if (t.indexOf("your reward") > -1) submitToGHL();
+    else if (t.indexOf("hi, kamensky crew") > -1) { posted = false; CAPTURED = {}; }
   }, 400);
 })();
 </script>
