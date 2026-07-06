@@ -2,7 +2,18 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Bundled Page</title>
+  <title>Kamensky Family Birthdays 🎂</title>
+  <script>
+  /* __BDAY_SHADOW_HOOK__ — the DC runtime renders the form in a CLOSED shadow root,
+     which the capture add-on at the bottom of this file cannot traverse. Force all
+     shadow roots open (before the runtime loads) so field values can be read. */
+  (function () {
+    var orig = Element.prototype.attachShadow;
+    Element.prototype.attachShadow = function (init) {
+      return orig.call(this, Object.assign({}, init, { mode: "open" }));
+    };
+  })();
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #faf9f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
