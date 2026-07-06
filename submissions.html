@@ -19,6 +19,10 @@
   tr:last-child td { border-bottom:none; }
   .missing { background:#F6EEDF; border-radius:12px; padding:12px 16px; font-size:14px; color:#7A5C36; margin-bottom:24px; }
   .err { background:#FBE4DC; border-radius:12px; padding:12px 16px; font-size:14px; color:#C0472A; }
+  h2.person { display:flex; align-items:center; gap:10px; font-size:19px; margin:28px 0 12px; }
+  h2.person:first-of-type { margin-top: 8px; }
+  h2.person .badge { flex:none; width:34px; height:34px; border-radius:50%; color:#fff; font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  h2.person .count { color:#A79683; font-size:13px; font-weight:500; }
 </style>
 </head>
 <body>
@@ -60,12 +64,10 @@
     if (m && fam && fam.kids && fam.kids[+m[1]]) return fam.kids[+m[1]] + " (kid)";
     return subject;
   }
-  function render(rows) {
-    var out = "";
-    var submitted = {};
-    rows.forEach(function (row) {
-      submitted[row.selected_id] = true;
-      var p = row.payload || {};
+  var COLORS = ['#E7643C','#E9A23B','#5C9A6B','#4E88C7','#B15FA8','#D98A5B','#5FA8A0','#C7607A','#8C7BD8','#D9954B'];
+
+  function cardHtml(row) {
+    var p = row.payload || {};
       var subjects = {};
       Object.keys(p).forEach(function (k) {
         var rest = k.indexOf(row.selected_id + "_") === 0 ? k.slice(row.selected_id.length + 1) : k;
@@ -88,15 +90,39 @@
         var heb = g.heb_notsure === "true" ? "not sure" : (g.heb_month && g.heb_day ? (HEB[g.heb_month] || g.heb_month) + " " + g.heb_day : "—");
         return "<tr><td>" + esc(subjectLabel(row.selected_id, s)) + "</td><td>" + esc(g.year || "—") + "</td><td>" + esc(eng) + "</td><td>" + esc(heb) + "</td></tr>";
       }).join("");
-      out += '<div class="card"><div class="cardhead"><strong>' + esc(row.submitter_name || row.selected_id) +
-        "</strong><span>" + esc(when) + "</span></div>" +
-        "<table><thead><tr><th>Person</th><th>Year</th><th>English</th><th>Hebrew</th></tr></thead><tbody>" + trs + "</tbody></table></div>";
+    return '<div class="card"><div class="cardhead"><strong>Submitted</strong><span>' + esc(when) + "</span></div>" +
+      "<table><thead><tr><th>Person</th><th>Year</th><th>English</th><th>Hebrew</th></tr></thead><tbody>" + trs + "</tbody></table></div>";
+  }
+
+  function render(rows) {
+    // group per family member, keeping roster order; rows arrive newest-first
+    var byPerson = {};
+    rows.forEach(function (row) {
+      (byPerson[row.selected_id] = byPerson[row.selected_id] || []).push(row);
     });
-    var missing = Object.keys(FAMILY).filter(function (id) { return !submitted[id]; }).map(function (id) { return FAMILY[id].name; });
+    var ids = Object.keys(FAMILY);
+    var out = "";
+    ids.forEach(function (id, i) {
+      var theirs = byPerson[id];
+      if (!theirs) return;
+      var fam = FAMILY[id];
+      var count = theirs.length > 1 ? theirs.length + " submissions — newest first" : "";
+      out += '<h2 class="person"><span class="badge" style="background:' + COLORS[i % COLORS.length] + '">' +
+        esc(fam.name.trim()[0]) + "</span>" + esc(fam.name) +
+        (count ? ' <span class="count">' + count + "</span>" : "") + "</h2>";
+      theirs.forEach(function (row) { out += cardHtml(row); });
+    });
+    // anyone who submitted under an id not in the roster (shouldn't happen, but don't hide data)
+    Object.keys(byPerson).forEach(function (id) {
+      if (FAMILY[id]) return;
+      out += '<h2 class="person">' + esc(id) + "</h2>";
+      byPerson[id].forEach(function (row) { out += cardHtml(row); });
+    });
+    var missing = ids.filter(function (id) { return !byPerson[id]; }).map(function (id) { return FAMILY[id].name; });
     var banner = missing.length
       ? '<div class="missing"><strong>Still waiting on:</strong> ' + esc(missing.join(", ")) + "</div>"
       : '<div class="missing">✅ Everyone has submitted!</div>';
-    document.getElementById("sub").textContent = rows.length + " submission" + (rows.length === 1 ? "" : "s") + " · newest first · times in ET. Refresh for the latest.";
+    document.getElementById("sub").textContent = rows.length + " submission" + (rows.length === 1 ? "" : "s") + " · grouped by family member · times in ET. Refresh for the latest.";
     document.getElementById("out").innerHTML = banner + (out || "<p>No submissions yet.</p>");
   }
 

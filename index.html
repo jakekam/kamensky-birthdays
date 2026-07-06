@@ -215,6 +215,11 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   function grab(el) {
     if (!el || !el.name) return;
+    /* only real form fields with real {personId}_{subject}_{group} names — the page's
+       meta[name=viewport] and un-rendered "{{ ... }}" template names must never leak in */
+    var tag = el.tagName;
+    if (tag !== "SELECT" && tag !== "INPUT" && tag !== "TEXTAREA") return;
+    if (!/^[a-z]+_(self|spouse|kid\d+)_/.test(el.name)) return;
     if (el.type === "checkbox") CAPTURED[el.name] = el.checked ? "true" : "false";
     else if (el.value !== "") CAPTURED[el.name] = el.value;
   }
@@ -223,9 +228,11 @@ document.addEventListener('DOMContentLoaded', async function() {
   document.addEventListener("input", function (e) { grab(e.target); }, true);
 
   function selectedId() {
+    /* a real submission always includes self fields (the flow starts with your own
+       birthday) — no fallback, so a half-rendered page can never post a junk row */
     var ks = Object.keys(CAPTURED);
     for (var i = 0; i < ks.length; i++) if (ks[i].indexOf("_self_") > -1) return ks[i].split("_")[0];
-    return ks.length ? ks[0].split("_")[0] : null;
+    return null;
   }
 
   function submitToGHL() {
@@ -251,11 +258,26 @@ document.addEventListener('DOMContentLoaded', async function() {
     }).catch(function (err) { console.error("GHL post failed", err); posted = false; });
   }
 
+  var VIEW_URL = "https://jakekam.github.io/kamensky-birthdays/submissions.html?view=ebeac3d276cddb8589246c8f";
+  function ensureViewLink() {
+    if (deepAll("#bday-view-link").length) return;
+    var btn = deepAll("button").filter(function (b) {
+      return (b.innerText || "").indexOf("Someone else") > -1;
+    })[0];
+    if (!btn || !btn.parentNode) return;
+    var a = document.createElement("a");
+    a.id = "bday-view-link";
+    a.href = VIEW_URL;
+    a.textContent = "See everyone’s submissions →";
+    a.style.cssText = "display:block; margin-top:16px; color:#E7643C; font-weight:700; font-size:15px; text-decoration:none; font-family:inherit;";
+    btn.parentNode.insertBefore(a, btn.nextSibling);
+  }
+
   setInterval(function () {
     deepAll("[name]").forEach(grab);
     /* innerText reflects CSS text-transform (the reward label renders uppercase), so compare lowercase */
     var t = deepText().toLowerCase();
-    if (t.indexOf("your reward") > -1) submitToGHL();
+    if (t.indexOf("your reward") > -1) { submitToGHL(); ensureViewLink(); }
     else if (t.indexOf("hi, kamensky crew") > -1) { posted = false; CAPTURED = {}; }
   }, 400);
 })();
